@@ -26,6 +26,7 @@ REQUIRED = [
 # What packages are optional?
 EXTRAS = {
     'permit to generate frequencies.json using html data': ['requests_html'],
+    ':python_version == "2.7"': ['statistics', 'backports.functools_lru_cache'],
 }
 
 # The rest you shouldn't have to touch too much :)
