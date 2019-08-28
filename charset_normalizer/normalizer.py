@@ -1,6 +1,9 @@
 # coding: utf-8
+import binascii
 import re
 import statistics
+import sys
+import zlib
 from encodings.aliases import aliases
 from os.path import basename, splitext
 import collections
@@ -28,7 +31,10 @@ class CharsetNormalizerMatch:
         self._encoding = guessed_source_encoding
         self._chaos_ratio = chaos_ratio
 
-        self._string = str(self._raw, encoding=self._encoding).replace('\r', '')
+        if sys.version_info[0] == 3:
+            self._string = str(self._raw, encoding=self._encoding).replace('\r', '')
+        else:
+            self._string = unicode(self._raw).decode(encoding=self._encoding).replace('\r', '')
 
         self._string_printable_only = re.sub(CharsetNormalizerMatch.RE_NOT_PRINTABLE_LETTER, ' ', self._string.lower())
         self.char_counter = HashableCounter(self._string_printable_only.replace(' ', ''))
@@ -235,11 +241,17 @@ class CharsetNormalizerMatches:
 
             tested.add(p)
 
+            ignore_exceptions = (UnicodeDecodeError, LookupError)
+            if sys.version_info[0] == 2:
+                ignore_exceptions = ignore_exceptions + (
+                    IOError, TypeError, ValueError, binascii.Error, zlib.error)
+
             try:
-                str(sequences, encoding=p)
-            except UnicodeDecodeError:
-                continue
-            except LookupError:
+                if sys.version_info[0] == 3:
+                    str(sequences, encoding=p)
+                else:
+                    unicode(bytes(sequences).decode(encoding=p))
+            except ignore_exceptions:
                 continue
 
             chaos_measures = list()
@@ -249,7 +261,10 @@ class CharsetNormalizerMatches:
             for i in range(0, maximum_length, int(maximum_length / steps)):
 
                 chunk = sequences[i:i + chunk_size]
-                decoded = str(chunk, encoding=p, errors='ignore')
+                if sys.version_info[0] == 3:
+                    decoded = str(chunk, encoding=p, errors='ignore')
+                else:
+                    decoded = chunk.decode(encoding=p, errors='ignore')
 
                 probe_chaos = ProbeChaos(decoded)
                 chaos_measure, ranges_encountered = probe_chaos.ratio, probe_chaos.encountered_unicode_range_occurrences
